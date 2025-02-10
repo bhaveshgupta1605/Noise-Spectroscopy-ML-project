@@ -1,172 +1,273 @@
-# Noise Spectroscopy using ML
+# Qubit Noise Spectroscopy with Deep Learning
 
-## To evaluate a decoherence curve from an underlying noise spectrum
-Siddharth Dhomkar, Department of Physics, IIT Madras
+This repository contains Python code for using deep learning to analyze and understand noise in qubit systems.  It's based on the work described in:
 
-**Based on**:
+> D.F. Wise, J.J.L. Morton, and S. Dhomkar, “Using deep learning to understand and mitigate the qubit noise environment”, PRX Quantum 2, 010316 (2021)
 
-D.F. Wise, J.J.L. Morton, and S. Dhomkar, “Using deep learning to understand and mitigate the qubit noise environment”, PRX Quantum 2, 010316 (2021)
+## Overview
 
-*   https://doi.org/10.1103/PRXQuantum.2.010316
-*   http://dx.doi.org/10.1103/PhysRevApplied.18.024004
+The code allows you to:
 
-## Functions to generate coherence curve from a given set of noise spectra
+1.  **Generate training data:**  Simulate noise spectra and corresponding coherence decay curves.
+2.  **Train a neural network:**  Learn the relationship between coherence curves and noise spectra.
+3.  **Analyze experimental data:**  Use the trained network to predict the noise spectrum from experimental coherence measurements.
+4.  **Optimal Dynamic Decoupling Sequence Generation:** Generate optimized pulse sequence to maximize coherence.
 
-It is virtually impossible to extract the underlying noise spectrum from a decoherence curve. However, it is possible to obtain an unique coherence decay, if the precise functional form of the noise spectrum is known. This observation is utilized to generate the training datasets.
+## Repository Structure
 
-Qubit noise spectra, $S(\omega)$, can be of various functional forms including $1/f$-like, Lorentzian-like, double-Lorentzian-like etc. It is possible to simulate such noise spectra and corresponding decoherence curve, $C(t)$, can then be evaluated consequently using following relation:
+The repository is organized as follows:
 
-$$- ln C(t) =  \int_{0}^{\infty}\frac{d\omega}{\pi}S(\omega)\frac{F(\omega t)}{\omega^{2}}$$
+*   `MAIN.py`: The main script for training and evaluating the neural network.
+*   `optimalDD_functions.py`: Contains functions related to generating and analyzing optimal dynamic decoupling (DD) sequences.
+*   `expt_data_analysis.py`:  Functions for loading, normalizing, and analyzing experimental data, including fitting coherence curves.
+*   `train_data_generation_functions.py`:  Functions for generating synthetic training data, including noise spectra and coherence curves.
+*   `data/`: (This directory is assumed) Contains the `Mar6_x32_noisy.npz` dataset (or similar).
+*   `TRAINED_NETWORKS/`: (This directory is assumed) Where trained network models are saved.
 
-where, $F(\omega t)$ is the filter function associated with the decoupling protocol used for probing the decoherence dynamics.
+## Dependencies
 
-(The detailed explanation of data generation process can be found in the manuscript.)
+*   tensorflow
+*   scikit-learn
+*   numpy
+*   matplotlib
+*   scipy
+*   plotly
 
-**Generate the filter function**
+You can install the necessary packages using `pip`:
 
-References pertaining to superconducting qubit noise spectra:
+pip install tensorflow scikit-learn numpy matplotlib scipy plotly
 
-*   https://doi.org/10.1038/ncomms1856
-*   https://www.nature.com/articles/ncomms12964
-*   https://doi.org/10.1103/PhysRevApplied.18.044026
-*   https://doi.org/10.1103/PhysRevResearch.3.013045
-*   http://dx.doi.org/10.1103/PhysRevB.79.094520
-*   http://dx.doi.org/10.1103/PhysRevB.77.174509
-*   https://doi.org/10.1063/1.5089550
+## Data Format
 
-## Experimental data analysis
+The code uses `.npz` files for data storage.  Specifically, the `MAIN.py` script expects a file named `"data/Mar6_x32_noisy.npz"` (the path is hardcoded). This file should contain the following arrays:
 
-Imports the necessary libraries for data manipulation, curve fitting, progress tracking, and interactive plotting.
-- numpy: Fundamental package for scientific computing with Python.
-- scipy.optimize.curve_fit: Module for fitting a function to data.
-- tqdm.notebook.trange: Provides a progress bar for loops in Jupyter notebooks.
-- plotly.graph_objs as go: Interface to the `plotly` library for creating interactive plots.
+*   `c_in`:  Coherence data.
+*   `T_in`:  Time vector for data generation.
+*   `s_in`:  Noise spectra data.
+*   `w0`:  Omega (frequency) vector for data generation.
+*   `T_train`:  Time vector for training data (based on the experimental data).
+*   `w_train`:  Omega vector for training data.
 
-### Defines the layout settings for the figure template.
-Layout settings:
-- Template style: 'simple_white+presentation'
-- Autosize: False
-- Width: 800
-- Height: 600
-- X-axis settings: Title, ticks, mirror, linewidth, tickwidth, ticklen, showline, showgrid, zerolinecolor
-- Y-axis settings: Title, ticks, mirror, linewidth, tickwidth, ticklen, showline, showgrid, zerolinecolor
-- Font family: mathjax
-- Font size: 16
-- Colorway: ["#d9ed92","#b5e48c","#99d98c","#76c893","#52b69a","#34a0a4","#168aad","#1a759f","#1e6091","#184e77"]
+## Usage
 
-### Load the experimental data as npz file from the specified path: 
-expt_data = np.load(path,allow_pickle=True)
+### 1. Data Generation (using `train_data_generation_functions.py`)
 
-expt_data.files ---> should contain 'pop_t1','pop_t2' and 'xval' data files: 
-print(f'files in expt_data: {expt_data.files}')
-files in expt_data:
-- 'xval': Experiemnt time array
-- 'pop_t1': population of |1> at corresponding time array
-- 'pop_t2_[hahn/X32/XY4/...]': population of |0> at corresponding time array
-Then assign the data to the variables:
-- expt_t_data = expt_data['xval'] ----> shape = (size of time array,)
-- expt_T1_data = expt_data['pop_t1']--> shape = (indexing of qubit number, pop_t1 data value at that time)
-- expt_T2_data = expt_data['pop_t2']--> shape = (indexing of qubit number, pop_t2 data value at that time)
+The `train_data_generation_functions.py` script provides functions to simulate noise spectra and their corresponding coherence curves.
 
-### Normalise the input data by subtracting 0.5 and then dividing by 0.5. 
-Parameters:
-- data (float) : The input data to be normalized.
-Returns:
-- float : The normalized data.
+*   **`cpmgFilter(n, Tmax)`:** Generates an array of time points for a CPMG pulse sequence.
 
-### Normalize the given T2 data array by dividing each row by the mean of the first 3 elements of that row.
-Parameters:
-- expt_T2_data (numpy.ndarray): The experimental T2 data array to be normalize
-  
-Returns:
-- (numpy.ndarray): the normalized T2 data array
+    *   `n`: Number of π pulses.
+    *   `Tmax`: Total duration of the sequence.
 
-### A function that calculates the exponential decay of T0 divided by T1.
+*   **`getFilter(n, w0, piLength, Tmax)`:**  Calculates the filter function for a CPMG sequence.
 
-Parameters:
-- T0: The base value used in the exponential calculation.
-- T1: The divisor value used in the exponential calculation.
-  
-Returns:
-- The result of the exponential calculation.
+    *   `n`: Number of π pulses.
+    *   `w0`: Angular frequency.
+    *   `piLength`: Duration of the π pulse.
+    *   `Tmax`: Total duration of the sequence.
 
-### Fit a simple exponential function to the given T1 data using scipy curve fit method.
+*   **`transmon_noise(T2, w)`:** Generates a transmon noise spectrum based on a T2\* value and frequency vector.
 
-Parameters:
-- expt_T1_data (np.ndarray): The experimental T1 data to fit the simple exponential function to.
-- T0 (float): The initial guess for the fitting.
-- bounds (tuple): The bounds for the fitting parameter T0.
+    *   `T2`: T2\* values.
+    *   `w`: Frequency vector.
 
-Example:
-- T0 = 10e-6
-- bounds = ([10e-6],[1000e-6])
-  
-Returns:
-- T1: The fitted T1 value.
-- T1err: The error in the fitted T1 value.
+*   **`getCoherence(S, w0, T0, n, piLength)`:**  Calculates the coherence decay curve given a noise spectrum, filter function, and time vector.
 
-### A function that calculate Stretched-exponential function, based on the input parameters T0, T2, p, and A.
+    *   `S`: Noise spectrum.
+    *   `w0`: Frequency vector.
+    *   `T0`: Time vector.
+    *   `n`: Number of π pulses.
+    *   `piLength`: Duration of the π pulse.
 
-Parameters:
-- T0 (float): The base value used in the exponential calculation.
-- T2 (float): The divisor value used in the exponential calculation.
-- p (float): The streaching parameter.
-- A (float): The amplitude parameter.
+*   **`SmoothTrainData(T_in, T2, w, n_pulse, piLength)`:** Generates smooth training data consisting of coherence curves, noise spectra, and fitting parameters.
 
-Returns: 
-- C (float): The value of Stretched-exponential function.
+    *   `T_in`: Time vector.
+    *   `T2`: T2\* values.
+    *   `w`: Frequency vector.
+    *   `n_pulse`: Number of π pulses.
+    *   `piLength`: Duration of the π pulse.
 
-### Fit a stretch exponential curve to the given data.
+*   **`NoisyTrainData(c_in, s_in, w_in, T_in, T_train, w_train)`:** Adds random noise to the generated coherence curves to create a more realistic training dataset.
 
-Parameters:
-- C (float): The data to fit the curve to using scipy curve fit method.
-- T0 (float): The independent variable for the curve fit.
-- bounds (tuple): The bounds for the curve fit. Example: bounds = ([100e-6,1,0.97],[400e-6,2,1.03])
+    *   `c_in`: Input c values.
+    *   `s_in`: Input s values.
+    *   `w_in`: Input w value.
+    *   `T_in`: Input T values.
+    *   `T_train`: Training T values.
+    *   `w_train`: Training w values.
+    *   `prepare_trainData`: Adding noise to the data using `np.random.normal`.
+    *   `interpData`: Interpolating the data using `scipy.interpolate.interp1d`.
 
-Returns:
-- Tuple: The fitted parameters T2, p, A, and their respective errors T2err, perr, Aerr.
+**Example Usage (Illustrative):**
 
-### Calculate experimental coherence curves data based on normalized T2 and experimental T1 data.
+import numpy as np
+from train_data_generation_functions import transmon_noise, getCoherence
+Define parameters
+T2_values = np.linspace(10e-6, 100e-6, 10) # Example T2 values
+w_values = np.logspace(3, 8, 1000) # Example frequency values
+T_values = np.geomspace(1e-6, 100e-6, 50) # Example time values
+n_pulses = 32
+pi_length = 48e-9
+Generate noise spectra
+s_values, w_out = transmon_noise(T2_values, w_values)
+Generate coherence curves
+c_values = getCoherence(s_values, w_out, T_values, n_pulses, pi_length)
+Now you can save c_values, s_values, w_out and T_values to a .npz file for training
+e.g., np.savez("my_training_data.npz", c_in=c_values, s_in=s_values, w0=w_out, T_in=T_values)
 
-Parameters:
-- norm_T2_data (np.ndarray): Array of normalized T2 data.
-- expt_T1_data (np.ndarray): Array of experimental T1 data.
 
-Returns:
-- (np.ndarray): Array of experimental coherence curves data.
+### 2. Network Training (using `MAIN.py`)
 
-### Generate the exponential fit parameters and fit curves for the given experimental data.
+The `MAIN.py` script trains a neural network to predict the noise spectrum from a given coherence curve.
 
-Parameters:
-- expt_c_data (np.ndarray): The experimental concentration data.
-- expt_t_data (np.ndarray): The experimental time data.
+**Command-line arguments:**
 
-Returns:
-- tuple[np.ndarray, np.ndarray]: A tuple containing the exponential fit parameters and fit curves.
+The script accepts several command-line arguments to configure the network architecture and training process:
 
-### Generate the T2 values and corresponding parameters for each row in the input array using the fit_stretchExp function.
+*   `--batch_size`: Batch size for training (default: 64).
+*   `--epochs`: Number of training epochs (default: 20).
+*   `--filters`: Number of filters in the convolutional layers (default: 40).
+*   `--kernel_size`: Kernel size in the convolutional layers (default: 5).
+*   `--initial_lr`: Initial learning rate (default: 1e-3).
+*   `--min_lr`: Minimum learning rate (default: 1e-6).
+*   `--min_delta`: Minimum change in loss to qualify as an improvement (default: 0.5).
+*   `--patience`: Number of epochs with no improvement after which learning rate will be reduced (default: 6).
+*   `--nb`:  (Purpose unclear from code, likely a network ID or similar).
+*   `--verbose`: Verbosity mode (0 or 1) (default: True).
+*   `--net_type`:  Type of network architecture to use (default: 1).
 
-Parameters:
-- c_check (numpy.ndarray): Input array of shape (n, m) where n is the number of rows and m is the number of columns.
-- T_train (numpy.ndarray): Training data array.
+**Example Usage:**
 
-Returns:
-- Tuple[numpy.ndarray, numpy.ndarray]: A tuple containing two numpy arrays. The first array contains the T2 values multiplied by 1e6 and rounded to 1 decimal place. The second array contains the corresponding parameters rounded to 2 decimal places.
+python MAIN.py --batch_size 128 --epochs 50 --filters 64 --initial_lr 1e-4
 
-### Generate a plot of experimental coherence data against evolution time for each qubit. 
 
-Parameters:
-- expt_c_data (numpy.ndarray): Array of coherence data for each qubit.
-- expt_t_data (numpy.ndarray): Array of evolution time data.
-- 
-Returns:
-- go.Figure: A plot displaying the coherence data for each qubit and corresponding fit curves.
+This command will train the network using a batch size of 128, for 50 epochs, with 64 filters, and an initial learning rate of 1e-4.
 
-### Create a heatmap plot based on the experimental transmon data and control data.
+**Key steps in `MAIN.py`:**
 
-Parameters:
-- expt_t_data: The experimental transmon data
-- expt_c_data: The experimental control data
+1.  **Load data:** Loads the training data from `"data/Mar6_x32_noisy.npz"`.
+2.  **Data formatting:** Calls `generate_final_data` (likely from a helper module) to format the data for training.
+3.  **Model creation:** Calls `get_model` (likely from a helper module, not provided) to create the neural network model.  The architecture depends on `net_type`.
+4.  **Compilation:** Compiles the model with the Adam optimizer and MAPE (Mean Absolute Percentage Error) loss function.
+5.  **Training:** Trains the model using `model.fit`, with a `ReduceLROnPlateau` callback to adjust the learning rate during training.
+6.  **Saving:** Saves the trained model to the `TRAINED_NETWORKS/` directory.
+7.  **Testing:**  Makes predictions on the test set and generates plots comparing predicted and actual noise spectra.
 
-Returns:
-- fig: The generated heatmap plot
+### 3. Experimental Data Analysis (using `expt_data_analysis.py`)
+
+The `expt_data_analysis.py` script provides functions to load, normalize, and analyze experimental data.
+
+*   **`normalise(data)`:** Normalizes experimental data.
+*   **`normT2data(expt_T2_data)`:** Normalizes T2 data.
+*   **`simpleExp(T0, T1)`:** Calculates a simple exponential decay.
+*   **`fit_simpleExp(expt_T1_data, T0, bounds)`:** Fits a simple exponential function to T1 data.
+*   **`stretchExp(T0, T2, p, A)`:** Calculates a stretched exponential function.
+*   **`fit_stretchExp(C, T0, bounds)`:** Fits a stretched exponential function to data.
+*   **`c_expt_data(norm_T2_data, expt_T1_data)`:** Calculates experimental coherence curves.
+*   **`get_c_expt_fitPar_fitCurves(expt_c_data, expt_t_data)`:** Fits stretched exponentials to experimental coherence curves and extracts the fitting parameters.
+*   **`get_fitPar(c_check, T_train)`:** Fits multiple coherence curves to obtain values of T2 and p (stretching factor).
+*   **`get_c_expt_plot(expt_c_data, expt_t_data)`:** Generates a plot of experimental coherence data and their fits.
+*   **`heatmap(expt_t_data, expt_c_data)`:** Creates a heatmap visualization of the experimental data.
+
+**Example Usage:**
+
+import numpy as np
+from expt_data_analysis import normT2data, c_expt_data, get_c_expt_plot
+Load experimental data
+expt_data = np.load('data/T1_T2_data.npz', allow_pickle=True) # Replace with your data path
+expt_t_data = expt_data['xval']
+expt_T1_data = expt_data['pop_t1']
+expt_T2_data = expt_data['pop_t2_X32']
+Normalize the data
+norm_X32_data = normT2data(expt_T2_data)
+expt_c_data_X32 = c_expt_data(norm_X32_data, expt_T1_data)
+Plot the coherence curves
+get_c_expt_plot(expt_c_data_X32, expt_t_data)
+
+
+### 4. Optimal Dynamic Decoupling (using `optimalDD_functions.py`)
+
+The `optimalDD_functions.py` script provides functions to design optimal dynamic decoupling (DD) sequences to minimize the effects of noise.
+
+*   **`cpmgFilter(n, Tmax)`:** Generates CPMG pulse timings.
+*   **`getFilter(n, w0, piLength, Tmax)`:** Calculates the filter function for a CPMG sequence.
+*   **`arbFilter(w0, piLength, tpi, Tmax)`:** Calculates the filter function for an *arbitrary* pulse sequence.
+*   **`getCoherence(S, w0, T0, n, piLength)`:** Calculates coherence under a CPMG sequence.
+*   **`optCoherence(S, w0, piLength, tpi, Tmax)`:** Calculates coherence under an *arbitrary* pulse sequence.
+*   **`stretchExp(T0, T2, p, A)`:** Stretched exponential function.
+*   **`fit_stretchExp(C, T0)`:** Fits a stretched exponential.
+*   **`predicted_s_plot(w_in, s_in)`:** Plots the predicted noise spectrum.
+*   **`w_low_s_low(w_in, w_extra)`:** Generates low-frequency noise data.
+*   **`w_extend_s_extend(s_in, w_in, s_low, w_low, s_select)`:** Extends the frequency range of the noise spectrum.
+*   **`c_extend(s_extend, w_extend, T_in, piLength)`:** Calculates coherence for the extended spectrum.
+*   **`customDD(s_extend, w_extend, piLength, x, Tmax)`:**  Calculates coherence for a custom DD sequence (the function to be minimized in the optimization).
+*   **`c_dd_c_cpmg(s_in, w_in, s_low, w_low, data_points, n_plots, n, piLength)`:**  Compares coherence under custom DD and CPMG sequences.
+*   **`c_dd_c_cpmg_plot(C_DD, C_CPMG, Tmax, n_plots)`:**  Plots the coherence comparison.
+*   **`cpmg_optimal_c_vals(w_low, s_low, w_in, s_in, s_select, n_pi, data_points, piLength)`:** Calculates coherence values for both CPMG and optimized DD sequences.
+*   **`comparison_plot(C_vals, C_vals_new, Tmax, n)`:**  Plots a comparison of coherence improvement.
+
+**Optimization Process**
+
+The key idea is to find the pulse timings (`tpi`) that *minimize* the coherence decay. This is done using `scipy.optimize.minimize`. The `customDD` function calculates the *negative* of the coherence, so minimizing it maximizes the coherence.
+
+**Constraints**
+
+The optimization includes linear constraints to ensure that the pulse timings are physically realizable:
+
+*   The pulses must be ordered in time.
+*   There must be sufficient time for all pulses within the total sequence duration (`Tmax`).
+
+**Example Usage:**
+
+import numpy as np
+from scipy.optimize import minimize, Bounds, LinearConstraint
+from optimalDD_functions import customDD, cpmgFilter
+Example Parameters
+n = 8 # Number of pulses
+piLength = 48e-9 # Pulse length
+Tmax = 300e-6 # Total sequence time
+Define objective function (negative coherence)
+def objective(x):
+# Assuming you have s_extend and w_extend defined elsewhere (noise spectrum data)
+# You'll need to load or generate these based on your noise model
+global s_extend, w_extend # Access s_extend and w_extend
+
+return customDD(s_extend, w_extend, piLength, x, Tmax) #negative coherence
+
+Initial guess (CPMG timings)
+x0 = cpmgFilter(n, Tmax)
+Bounds (pulse timings must be greater than half the pulse length)
+lower_bounds = np.array([(1/2 + i) * piLength for i in range(n)])
+upper_bounds = np.array([Tmax - (n - (2*i + 1)/2) * piLength for i in range(n)]) #upper bound equation
+bounds = Bounds(lower_bounds,upper_bounds)
+Linear constraints (pulses must be ordered)
+coeff_matrix = -np.diag(np.ones(n)) #diagonal matrix
+for i in range(n-1):
+coeff_matrix[i, i+1] = 1
+M = coeff_matrix[:-1] # M matrix
+lower_B = piLength*np.ones(n-1) #lower bound condition
+upper_B = (Tmax-(n-1)*piLength)*np.ones(n-1) #upper bound condition
+linear_constraint = LinearConstraint(M, lower_B, upper_B) #linear constraint in pulse sequence
+
+Optimization
+res = minimize(objective, x0, method='SLSQP',
+constraints=[linear_constraint],
+bounds=bounds) #minimize constraints
+print(res) #display result
+res.x now contains the optimized pulse timings
+
+
+**Important:**  The example above is a *skeleton*.  You'll need to:
+
+1.  **Define `s_extend` and `w_extend`:**  These represent your noise spectrum.  You'll likely load these from a file or generate them using the functions in `train_data_generation_functions.py` and  `optimalDD_functions.py` (the `w_extend_s_extend` function, for example).  The noise spectrum is *crucial* for the optimization.
+2.  **Adapt the objective function:**  Make sure the `objective` function correctly calls `customDD` with *your* noise spectrum data.
+
+## Notes
+
+*   The code uses hardcoded file paths (e.g., `"data/Mar6_x32_noisy.npz"`).  You should modify these to match your data organization.
+*   The `get_model` function is not provided in the given files. You'll need to define this function (likely in a separate module) to create your neural network architecture.
+*   The `optimalDD_functions.py` script contains a comment "`# Not complete for last function to compare filter function of cpmg and optimal!!`".  This indicates that the `cpmg_optimal_filter_comp_plot` function is not fully implemented.
+
+## Contributing
+
+Contributions are welcome! Please submit pull requests with bug fixes, improvements, or new features.
