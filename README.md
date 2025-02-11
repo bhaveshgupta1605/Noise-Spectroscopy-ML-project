@@ -107,6 +107,110 @@ The script uses a predefined `plotly` figure template (`fig_template`) to ensure
 
 This script provides a flexible framework for generating training data for qubit decoherence analysis. By adjusting the parameters and functions, you can tailor the generated data to match the characteristics of your specific qubit system and experimental setup.
 
+# Qubit Noise Spectroscopy Network Training Script
+
+This script (`network_functions.py`) trains a 1D convolutional neural network (CNN) to denoise noise spectroscopy data related to qubit characterization. It's designed to learn the relationship between noisy coherence curves and underlying noise spectra, allowing for improved noise estimation in quantum devices.
+
+## Overview
+
+The script performs the following main tasks:
+
+1.  **Model Definition:** Defines a 1D CNN architecture using Keras for denoising noise spectroscopy data.
+2.  **Data Loading and Formatting:** Loads training data from an `.npz` file, formats the data for training, and splits it into training and testing sets.  The expected data format is specific to the outputs of `data_generation_functions.py`.
+3.  **Training:** Trains the CNN model using the prepared data, employing techniques like learning rate reduction on plateau and callbacks for monitoring performance.
+4.  **Evaluation:** Evaluates the trained model on the test set and saves the model, training history, and example predictions.
+5.  **Hyperparameter Tuning:** The script is designed to be run with command-line arguments to easily explore different hyperparameter configurations.
+
+**Based on:**
+
+D.F. Wise, J.J.L. Morton, and S. Dhomkar, “Using deep learning to understand and mitigate the qubit noise environment”, PRX Quantum 2, 010316 (2021)
+
+*   <https://doi.org/10.1103/PRXQuantum.2.010316>
+*   <http://dx.doi.org/10.1103/PhysRevApplied.18.024004>
+
+## Dependencies
+
+The script requires the following Python libraries:
+
+*   `tensorflow`: For building and training the neural network.
+*   `scikit-learn`: For splitting the data into training and testing sets.
+*   `numpy`: For numerical computations and array manipulation.
+*   `matplotlib`: For plotting training history and test results.
+*   `data_generation_functions`: A custom module (assumed to be in the same directory) containing functions for preparing the training data.  The training data needs to be formatted according to the expectations of `generate_final_data()`.
+
+You can install these dependencies using pip:
+
+
+You'll also need to ensure `data_generation_functions.py` is in the same directory or that Python can find it on its path.
+
+## Usage
+
+### 1. Data Preparation
+
+The script expects training data to be stored in an `.npz` file.  This `.npz` file should be created by a script like `data_generation_functions.py` and should contain the following arrays:
+
+*   `c_in`: Input coherence data (noisy).
+*   `T_in`: Time vector corresponding to the input coherence data.
+*   `s_in`:  Target noise spectra.
+*   `w_in`:  Frequency vector corresponding to the noise spectra.
+*   `T_train`: Time vector for training data (based on the experimental data).
+*   `w_train`: Frequency vector for training data.
+
+The script loads the data using `np.load("data/Mar6_x32_noisy.npz")`. **Modify this path** to point to your data file. Place the data file in a directory named `data/` or adjust the path accordingly.
+
+### 2. Running the Script
+
+The script is designed to be run from the command line, allowing for easy adjustment of hyperparameters.  Here's an example: python network_functions.py --batch_size 64 --epochs 100 --filters 16 --kernel_size 21 --initial_lr 0.001 --min_lr 0.00001 --patience 5 --min_delta 0.1 --verbose 1 --net_type 1
+
+
+You can create a bash script (as provided at the beginning of the file) to automate running the script with different hyperparameter settings.
+
+### 3. Command-Line Arguments
+
+The script accepts the following command-line arguments:
+
+*   `--batch_size`: Batch size for training. Default: 64
+*   `--epochs`: Number of training epochs. Default: 20
+*   `--filters`: Number of filters in the convolutional layers. Default: 40
+*   `--kernel_size`: Size of the convolutional kernel. Default: 5
+*   `--initial_lr`: Initial learning rate. Default: 0.001
+*   `--min_lr`: Minimum learning rate for learning rate reduction. Default: 1e-6
+*   `--min_delta`: Minimum change in loss to qualify as an improvement for learning rate reduction. Default: 0.5
+*   `--patience`: Number of epochs with no improvement before reducing the learning rate. Default: 6
+*   `--verbose`: Verbosity level (0 or 1). Default: True
+*   `--net_type`:  An integer representing the type of network (potentially for different architectures).  Currently unused in the provided code. Default: 1
+
+### 4. Output
+
+The script generates the following output:
+
+*   **Trained Model:** Saves the trained Keras model to the `TRAINED_NETWORKS/` directory with a filename that includes the hyperparameters used for training (e.g., `TRAINED_NETWORKS/MODEL_... .h5`).
+*   **Training History Plot:**  Saves a plot of the training and validation loss (Mean Absolute Percentage Error - MAPE) over epochs to `TRAINED_NETWORKS/VAL_ACC_HISTORY_... .pdf`.
+*   **Test Results Plot:** Saves a plot comparing the predicted noise spectra to the true noise spectra for a random subset of the test data to `TRAINED_NETWORKS/MODEL_TEST_... .pdf`.
+*   **Console Output:** Prints the hyperparameters used for training, the training time, and the final validation loss (accuracy).
+
+## Function Details
+
+*   **`get_model(filter_nb, kernel_size, pool_size, dropout_rate, xtrain_size)`**: This function defines the 1D CNN architecture. It consists of multiple convolutional layers with ReLU activation, max pooling layers, upsampling layers, and a final dense layer to output the predicted noise spectrum.  The architecture includes:
+    *   Input layer: Takes the coherence curve as input.
+    *   Convolutional layers: Extract features from the input data.
+    *   Max pooling layers: Reduce the dimensionality of the data and capture important features.
+    *   Up-sampling layers: Increase the dimensionality of the data to match the size of the output.
+    *   Dropout layer: Prevents overfitting by randomly dropping out neurons during training.
+    *   Dense layer: Maps the learned features to the output noise spectrum.
+
+*   **`generate_final_data( c_data, T_in, s_data, w0, T_train, w_train )`**: This function, which is assumed to be in `data_generation_functions.py`, prepares the data for training. It likely involves interpolating the data to a common time axis and potentially adding noise.  The exact implementation is not visible in the provided code.
+
+## Notes
+
+*   The performance of the trained model depends heavily on the quality and quantity of the training data. It's crucial to generate a realistic and diverse training dataset that accurately represents the noise environment of the qubit system.
+*   The choice of hyperparameters (e.g., number of filters, kernel size, learning rate) can significantly impact the model's performance. Experimentation with different hyperparameter settings is recommended to find the optimal configuration for your specific application.
+*   The script uses Mean Absolute Percentage Error (MAPE) as the loss function. You may want to explore other loss functions depending on the characteristics of your data and the specific goals of your analysis.  MAPE is sensitive to small values in the target variable.
+*   The script uses `tensorflow.keras.optimizers.legacy.Adam`. Depending on your TensorFlow version, you might need to use `tensorflow.keras.optimizers.Adam` directly.
+*   The script saves the model and plots to the `TRAINED_NETWORKS/` directory. Make sure this directory exists before running the script.
+
+This script provides a starting point for training a neural network to denoise qubit noise spectroscopy data. By customizing the model architecture, training parameters, and data preprocessing steps, you can adapt the script to meet the specific requirements of your application.
+
 # Experimental Data Analysis Script
 
 This script (`expt_data_analysis.py`) is designed for analyzing experimental data related to qubit coherence measurements, specifically T1 and T2 decay. It includes functions for data normalization, curve fitting using exponential and stretched-exponential models, and generating interactive plots to visualize the results.
