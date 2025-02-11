@@ -5,11 +5,14 @@ This script (`train_data_generation_functions.py`) provides a set of functions f
 **Based on:**
 
 *   B. Gupta, V. Joshi, U. Kandpal, P. Mandayam, N. Gheeraert, S. Dhomkar, "Expedited Noise Spectroscopy of Transmon Qubits", arXiv.2502.00679 (2025)
-*   <https://doi.org/10.48550/arXiv.2502.00679>
-*   D.F. Wise, J.J.L. Morton, and S. Dhomkar, “Using deep learning to understand and mitigate the qubit noise environment”, PRX Quantum 2, 010316 (2021) 
-*   <https://doi.org/10.1103/PRXQuantum.2.010316>
+
+  <https://doi.org/10.48550/arXiv.2502.00679>
+*   D.F. Wise, J.J.L. Morton, and S. Dhomkar, “Using deep learning to understand and mitigate the qubit noise environment”, PRX Quantum 2, 010316 (2021)
+
+  <https://doi.org/10.1103/PRXQuantum.2.010316>
 *   F. Meneses, D. F. Wise, D. Pagliero, P. R. Zangara, S. Dhomkar, C. A. Meriles, "Toward Deep-Learning-Assisted Spectrally Resolved Imaging of Magnetic Noise", Physical Review Applied, 18 024004 (2022)
-*   <http://dx.doi.org/10.1103/PhysRevApplied.18.024004>
+
+  <http://dx.doi.org/10.1103/PhysRevApplied.18.024004>
 
 
 ## Overview
